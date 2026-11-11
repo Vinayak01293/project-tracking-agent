@@ -1,6 +1,5 @@
 
 import logging
-from typing import Optional
 
 import httpx
 from langchain_core.tools import tool

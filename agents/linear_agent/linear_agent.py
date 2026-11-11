@@ -1,10 +1,10 @@
 
 import logging
 
-from agents.linear_agent.linear_tools import create_linear_tools
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
+from agents.linear_agent.linear_tools import create_linear_tools
 from core.llm.llm_factory import get_llm
 from core.models.users import IntegrationProvider
 from core.repository.user_repository import UserRepository

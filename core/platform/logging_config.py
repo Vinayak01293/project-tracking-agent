@@ -2,7 +2,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 

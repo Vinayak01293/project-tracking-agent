@@ -21,6 +21,10 @@ backend/data/users.tmp
 backend/logs/
 *.log
 
+# User data and runtime storage
+users.json
+data/users.json
+
 # Frontend
 node_modules/
 dist/
