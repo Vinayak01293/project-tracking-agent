@@ -2,6 +2,7 @@
 import logging
 
 from agents.github_agent.github_agent import GitHubAgent
+from agents.linear_agent.linear_agent import LinearAgent
 
 logger = logging.getLogger("agent_router")
 
@@ -10,9 +11,7 @@ class AgentDispatcher:
 
     def __init__(self):
         self.github_agent = GitHubAgent()
-
-        # Add LinearAgent here when its implementation is ready.
-        self.linear_agent = None
+        self.linear_agent = LinearAgent()
 
     def dispatch(self, route: dict, query: str) -> dict:
         platform = route.get("platform")
@@ -33,18 +32,13 @@ class AgentDispatcher:
         )
 
         if platform == "github":
+            
             result = self.github_agent.invoke(
                 user_id=str(user_id),
                 query=query,
             )
 
         elif platform == "linear":
-            if self.linear_agent is None:
-                return {
-                    "success": False,
-                    "platform": "linear",
-                    "response": "The Linear Agent is not yet available.",
-                }
 
             result = self.linear_agent.invoke(
                 user_id=str(user_id),

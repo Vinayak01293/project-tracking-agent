@@ -1,15 +1,14 @@
-
 import logging
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field, SecretStr
+from pydantic import BaseModel, EmailStr, Field, SecretStr, model_validator
 
 from core.models.users import (
     IntegrationProvider,
     User,
-    UserRole,
+    UserIntegration,
 )
 from core.repository.user_repository import UserRepository
 from core.security.encryption import (
@@ -31,17 +30,46 @@ user_repository = UserRepository()
 # Request Schemas
 # --------------------------------------------------
 
+class IntegrationCreateRequest(BaseModel):
+    provider: IntegrationProvider = Field(
+        description="Which Provider to Integrate"
+    )
+    secret: SecretStr = Field(
+        description="Encrypted Secret like api-key/token")
+
+
 class CreateUserRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    email: EmailStr
-    role: UserRole = UserRole.USER
+    name: str = Field(
+        description="Name of the User",
+        min_length=1, 
+        max_length=100
+    )
+    email: EmailStr = Field(
+        description="Email ID"
+    )
+    integrations: list[IntegrationCreateRequest] = Field(
+        min_length=1,
+        max_length=2,
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_providers(self):
+        providers = [
+            integration.provider
+            for integration in self.integrations
+        ]
+
+        if len(providers) != len(set(providers)):
+            raise ValueError(
+                "Each integration provider can only be added once."
+            )
+
+        return self
 
 
-class CreateIntegrationRequest(BaseModel):
-    provider: IntegrationProvider
-    external_username: str = Field(min_length=1, max_length=255)
-    secret: SecretStr
-
+# --------------------------------------------------
+# Provider Credential Validation
+# --------------------------------------------------
 
 def validate_github_token(token: str) -> str:
     headers = {
@@ -59,19 +87,22 @@ def validate_github_token(token: str) -> str:
 
         if response.status_code == 401:
             raise HTTPException(
-                status_code=401,
+                status_code=400,
                 detail="Invalid or expired GitHub token.",
             )
 
         if response.status_code == 403:
             raise HTTPException(
-                status_code=403,
-                detail="GitHub denied the request. Check rate limits or token restrictions.",
+                status_code=400,
+                detail="GitHub denied the request. Check token permissions or rate limits.",
             )
 
         response.raise_for_status()
 
         return response.json()["login"]
+
+    except HTTPException:
+        raise
 
     except httpx.TimeoutException:
         raise HTTPException(
@@ -90,6 +121,85 @@ def validate_github_token(token: str) -> str:
             status_code=502,
             detail="GitHub API returned an unexpected error.",
         )
+
+
+def validate_linear_token(token: str) -> str:
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json",
+    }
+
+    query = """
+        query {
+            viewer {
+                id
+                name
+                displayName
+                email
+            }
+        }
+    """
+
+    try:
+        response = httpx.post(
+            "https://api.linear.app/graphql",
+            headers=headers,
+            json={"query": query},
+            timeout=15,
+        )
+
+        if response.status_code in (401, 403):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Linear API key or insufficient permissions.",
+            )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        if result.get("errors"):
+            raise HTTPException(
+                status_code=400,
+                detail="Linear API key validation failed.",
+            )
+
+        viewer = (result.get("data") or {}).get("viewer")
+
+        if not viewer:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to identify the Linear account.",
+            )
+
+        return (
+            viewer.get("displayName")
+            or viewer.get("name")
+            or viewer.get("email")
+        )
+
+    except HTTPException:
+        raise
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Linear API request timed out.",
+        )
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to connect to Linear.",
+        )
+
+    except httpx.HTTPStatusError:
+        raise HTTPException(
+            status_code=502,
+            detail="Linear API returned an unexpected error.",
+        )
+
+
 # --------------------------------------------------
 # Response Schemas
 # --------------------------------------------------
@@ -104,22 +214,21 @@ class UserResponse(BaseModel):
     id: UUID
     name: str
     email: EmailStr
-    role: UserRole
     is_active: bool
-    integrations: list[IntegrationResponse] = Field(default_factory=list)
+    integrations: list[IntegrationResponse] = Field(
+        default_factory=list
+    )
 
 
 def build_user_response(user: User) -> UserResponse:
     """
-    Converts a User into a safe API response.
-    Encrypted credentials are deliberately excluded.
+    Returns safe user metadata without exposing credentials.
     """
 
     return UserResponse(
         id=user.id,
         name=user.name,
         email=user.email,
-        role=user.role,
         is_active=user.is_active,
         integrations=[
             IntegrationResponse(
@@ -133,7 +242,7 @@ def build_user_response(user: User) -> UserResponse:
 
 
 # --------------------------------------------------
-# Create User
+# Create User with Integrations
 # --------------------------------------------------
 
 @router.post(
@@ -144,18 +253,55 @@ def build_user_response(user: User) -> UserResponse:
 def create_user(request: CreateUserRequest):
 
     try:
+        prepared_integrations = []
+
+        for integration_request in request.integrations:
+            provider = integration_request.provider
+            secret = integration_request.secret.get_secret_value()
+
+            if provider == IntegrationProvider.GITHUB:
+                external_username = validate_github_token(secret)
+
+            elif provider == IntegrationProvider.LINEAR:
+                external_username = validate_linear_token(secret)
+
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported integration provider.",
+                )
+
+            encrypted_secret = credential_manager.encrypt(secret)
+
+            prepared_integrations.append(
+                UserIntegration(
+                    provider=provider,
+                    external_username=external_username,
+                    encrypted_secret=encrypted_secret,
+                )
+            )
+
         user = user_repository.create_user(
             name=request.name,
             email=str(request.email),
-            role=request.role,
+            integrations=prepared_integrations,
         )
 
         logger.info(
-            "USER_CREATION_API_SUCCESS",
-            extra={"user_id": str(user.id)},
+            "USER_CREATION_WITH_INTEGRATIONS_SUCCESS",
+            extra={
+                "user_id": str(user.id),
+                "integration_providers": [
+                    integration.provider.value
+                    for integration in user.integrations
+                ],
+            },
         )
 
         return build_user_response(user)
+
+    except HTTPException:
+        raise
 
     except ValueError as exc:
         raise HTTPException(
@@ -163,81 +309,18 @@ def create_user(request: CreateUserRequest):
             detail=str(exc),
         )
 
-    except Exception:
-        logger.exception("USER_CREATION_API_FAILED")
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to create user.",
-        )
-
-
-# --------------------------------------------------
-# Add / Update User Integration
-# --------------------------------------------------
-
-@router.post(
-    "/{user_id}/integrations",
-    response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-)
-def add_user_integration(
-    user_id: UUID,
-    request: CreateIntegrationRequest,
-):
-
-    try:
-        if request.provider == IntegrationProvider.GITHUB:
-            github_username = validate_github_token(
-                request.secret.get_secret_value()
-            )
-            # Use the authenticated GitHub username rather than
-            # trusting a username supplied by the API caller.
-            external_username = github_username
-
-        else:
-            external_username = request.external_username
-
-        encrypted_secret = credential_manager.encrypt(
-            request.secret.get_secret_value()
-        )
-
-        user = user_repository.add_integration(
-            user_id=user_id,
-            provider=request.provider,
-            external_username=external_username,
-            encrypted_secret=encrypted_secret,
-        )
-
-        logger.info(
-            "INTEGRATION_CREATION_API_SUCCESS",
-            extra={
-                "user_id": str(user_id),
-                "provider": request.provider.value,
-            },
-        )
-
-        return build_user_response(user)
-
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )
-
     except CredentialEncryptionError:
         logger.exception("INTEGRATION_ENCRYPTION_FAILED")
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Unable to secure integration credentials.",
         )
 
     except Exception:
-        logger.exception("INTEGRATION_CREATION_API_FAILED")
+        logger.exception("USER_CREATION_WITH_INTEGRATIONS_FAILED")
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to save integration.",
+            status_code=500,
+            detail="Unable to create user with integrations.",
         )
-

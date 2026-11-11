@@ -18,13 +18,13 @@ def generate_agent_query(intent: dict, target_user_name: str) -> str:
             "Retrieve repositories starred by the authenticated GitHub account.",
 
         ("linear", "list_issues"):
-            "Retrieve issues from the selected Linear account.",
+            "Retrieve issues assigned to the authenticated Linear user.",
 
         ("linear", "list_projects"):
-            "Retrieve projects from the selected Linear account.",
+            "Retrieve projects accessible to the authenticated Linear account.",
 
         ("linear", "list_teams"):
-            "Retrieve teams from the selected Linear workspace.",
+            "Retrieve teams accessible to the authenticated Linear account.",
     }
 
     instruction = operations.get((platform, operation))

@@ -5,13 +5,10 @@ import threading
 from pathlib import Path
 from uuid import UUID
 
-import httpx
-
 from core.models.users import (
     IntegrationProvider,
     User,
     UserIntegration,
-    UserRole,
 )
 
 logger = logging.getLogger("platform")
@@ -73,11 +70,12 @@ class UserRepository:
     # User Operations
     # --------------------------------------------------
 
+    
     def create_user(
         self,
         name: str,
         email: str,
-        role: UserRole = UserRole.USER,
+        integrations: list[UserIntegration],
     ) -> User:
 
         with self._lock:
@@ -91,10 +89,18 @@ class UserRepository:
                         f"User with email {normalized_email} already exists."
                     )
 
+            # Prevent duplicate providers in one user request.
+            providers = [item.provider for item in integrations]
+
+            if len(providers) != len(set(providers)):
+                raise ValueError(
+                    "Each integration provider can only be added once."
+                )
+
             user = User(
                 name=name.strip(),
                 email=normalized_email,
-                role=role,
+                integrations=integrations,
             )
 
             data["users"].append(
@@ -105,10 +111,14 @@ class UserRepository:
 
             logger.info(
                 "USER_CREATED",
-                extra={"user_id": str(user.id), "role": user.role.value},
+                extra={
+                    "user_id": str(user.id),
+                    "integration_count": len(integrations),
+                },
             )
 
             return user
+
 
     def get_user_by_id(self, user_id: UUID | str) -> User | None:
 
