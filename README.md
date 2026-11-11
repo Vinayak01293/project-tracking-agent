@@ -23,7 +23,7 @@ Follow these steps to run the application locally from a fresh clone.
 ### 1. Clone the repository
 
 ``` bash
-git clone https://github.com/Jyothir020/Project-Tracking-Agent.git
+git clone https://github.com/Vinayak01293/project-tracking-agent.git
 cd Project-Tracking-Agent
 ```
 
@@ -46,7 +46,6 @@ source .venv/bin/activate
 ### 3. Install dependencies
 
 ``` bash
-python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
@@ -185,36 +184,6 @@ Project-Tracking-Agent/
 └── requirements.txt
 ```
 
-The exact subdirectories may evolve as the project changes. The
-important point is that `main.py`, `requirements.txt`, `agents/`,
-`core/`, `static/`, and `tests/` are at the repository root.
-
-### Generate the project tree
-
-Run this from the repository root.
-
-**Windows (Command Prompt or PowerShell):**
-
-``` cmd
-tree /F /A
-```
-
-**macOS / Linux (if `tree` is installed):**
-
-``` bash
-tree -a -I '.git|.venv|__pycache__|.pytest_cache|.mypy_cache'
-```
-
-**Alternative without installing `tree` (Python, cross-platform):**
-
-``` bash
-python -c "import os; skip={'.git','.venv','__pycache__','.pytest_cache','.mypy_cache'}; [print('    '*root.count(os.sep)+os.path.basename(root or '.')+'/') or [print('    '*(root.count(os.sep)+1)+f) for f in files if f not in skip] for root,dirs,files in os.walk('.') if not (dirs.__setitem__(slice(None),[d for d in dirs if d not in skip]))]"
-```
-
-For a cleaner project tree to share, exclude `.env`, `.venv`, `.git`,
-cache folders, and generated data files. Never include secrets in a tree
-screenshot or shared output.
-
 ------------------------------------------------------------------------
 
 ## Environment Configuration
@@ -335,13 +304,7 @@ The repository includes test scripts under `tests/`. For example:
 
 ``` bash
 python tests/linear_agent_tests.py
-```
-
-If the GitHub agent test script is present, run it using its actual
-filename under `tests/`:
-
-``` bash
-python tests/<github-agent-test-script>.py
+python tests/github_agent_test-script.py
 ```
 
 These scripts help test provider connectivity and specialist-agent
@@ -409,9 +372,6 @@ secrets.
 ## Current Assumptions and Limitations
 
 -   This is a take-home demonstration, not a production deployment.
--   The user directory is JSON-file-backed rather than database-backed.
-    Concurrent writes and multi-worker deployment are not
-    production-safe assumptions.
 -   The current GitHub and Linear operations are read-only.
 -   GitHub pull-request listing is scoped to pull requests authored by
     the authenticated GitHub account.
@@ -448,47 +408,14 @@ Run from the repository root.
 
 ------------------------------------------------------------------------
 
-## StackGen Assessment Coverage
-
-  -----------------------------------------------------------------------
-  Requirement                         Implementation
-  ----------------------------------- -----------------------------------
-  Intelligent routing                 Orchestration Agent routes requests
-                                      to GitHub or Linear specialist
-                                      agents.
-
-  Correct integration/user selection  Application resolves the registered
-                                      user and retrieves that user's
-                                      provider credential.
-
-  Clarification                       The orchestrator asks for the
-                                      target user when the request is
-                                      ambiguous and continues the pending
-                                      request after clarification.
-
-  Out-of-scope handling               Unsupported requests return
-                                      `I cannot answer this question`.
-
-  Real provider data                  Specialist agents call GitHub REST
-                                      and Linear GraphQL APIs.
-
-  Code organization                   Orchestration, specialist agents,
-                                      provider tools, API routes, and
-                                      core services are separated into
-                                      modules.
-  -----------------------------------------------------------------------
-
-For the demonstration, show GitHub routing, Linear routing,
-clarification, correct user/integration selection, and out-of-scope
-handling.
-
-------------------------------------------------------------------------
-
 ## Support
 
-When reporting a setup issue, include: 1. Operating system and Python
-version. 2. The command you ran. 3. The complete error message with
-credentials and sensitive values removed. 4. The stage where it failed
+When reporting a setup issue, include: 
+1. Operating system and Python
+version. 
+2. The command you ran. 
+3. The complete error message with
+credentials and sensitive values removed. 
+4. The stage where it failed
 (installation, startup, user registration, or query).
 
-Never share `.env`, GitHub tokens, Linear API keys, or Fernet keys.

@@ -18,7 +18,6 @@ class UserRepository:
     """
     JSON-based repository for application users and integrations.
     """
-
     def __init__(self, file_path: Path | None = None):
         self.file_path = file_path or (
             Path(__file__).resolve().parents[2]
@@ -26,18 +25,17 @@ class UserRepository:
             / "users.json"
         )
 
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-
         self._lock = threading.RLock()
-
-        if not self.file_path.exists():
-            self._write_data({"users": []})
 
     # --------------------------------------------------
     # Internal JSON Operations
     # --------------------------------------------------
 
     def _read_data(self) -> dict:
+
+        if not self.file_path.exists():
+            return {"users": []}
+        
         try:
             with self.file_path.open("r", encoding="utf-8") as file:
                 data = json.load(file)
@@ -57,6 +55,8 @@ class UserRepository:
         temporary_file = self.file_path.with_suffix(".tmp")
 
         try:
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+
             with temporary_file.open("w", encoding="utf-8") as file:
                 json.dump(data, file, indent=4, ensure_ascii=False)
 
@@ -65,7 +65,7 @@ class UserRepository:
         except Exception:
             logger.exception("USER_DIRECTORY_WRITE_FAILED")
             raise
-
+        
     # --------------------------------------------------
     # User Operations
     # --------------------------------------------------
