@@ -2,6 +2,10 @@
 import logging
 from uuid import UUID
 
+import httpx
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field, SecretStr
+
 from core.models.users import (
     IntegrationProvider,
     User,
@@ -12,8 +16,6 @@ from core.security.encryption import (
     CredentialEncryptionError,
     credential_manager,
 )
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field, SecretStr
 
 logger = logging.getLogger("platform")
 
@@ -41,6 +43,53 @@ class CreateIntegrationRequest(BaseModel):
     secret: SecretStr
 
 
+def validate_github_token(token: str) -> str:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    try:
+        response = httpx.get(
+            "https://api.github.com/user",
+            headers=headers,
+            timeout=15,
+        )
+
+        if response.status_code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired GitHub token.",
+            )
+
+        if response.status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail="GitHub denied the request. Check rate limits or token restrictions.",
+            )
+
+        response.raise_for_status()
+
+        return response.json()["login"]
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="GitHub API request timed out.",
+        )
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to connect to GitHub.",
+        )
+
+    except httpx.HTTPStatusError:
+        raise HTTPException(
+            status_code=502,
+            detail="GitHub API returned an unexpected error.",
+        )
 # --------------------------------------------------
 # Response Schemas
 # --------------------------------------------------
@@ -138,7 +187,17 @@ def add_user_integration(
 ):
 
     try:
-        # Encrypt the credential before persistence.
+        if request.provider == IntegrationProvider.GITHUB:
+            github_username = validate_github_token(
+                request.secret.get_secret_value()
+            )
+            # Use the authenticated GitHub username rather than
+            # trusting a username supplied by the API caller.
+            external_username = github_username
+
+        else:
+            external_username = request.external_username
+
         encrypted_secret = credential_manager.encrypt(
             request.secret.get_secret_value()
         )
@@ -146,7 +205,7 @@ def add_user_integration(
         user = user_repository.add_integration(
             user_id=user_id,
             provider=request.provider,
-            external_username=request.external_username,
+            external_username=external_username,
             encrypted_secret=encrypted_secret,
         )
 
@@ -181,3 +240,4 @@ def add_user_integration(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to save integration.",
         )
+

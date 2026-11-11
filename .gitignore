@@ -17,6 +17,10 @@ venv/
 backend/data/users.json
 backend/data/users.tmp
 
+# Application logs
+backend/logs/
+*.log
+
 # Frontend
 node_modules/
 dist/

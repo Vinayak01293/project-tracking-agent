@@ -5,6 +5,8 @@ import threading
 from pathlib import Path
 from uuid import UUID
 
+import httpx
+
 from core.models.users import (
     IntegrationProvider,
     User,
