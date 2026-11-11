@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Tracking Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">PT</div>
+                <div>
+                    <h1>Project Tracking</h1>
+                    <p>Multi-Agent Assistant</p>
+                </div>
+            </div>
+
+            <button id="new-session-btn" class="primary-btn full-width">+ New session</button>
+
+            <div class="section-heading">SESSIONS</div>
+            <div id="session-list" class="session-list"></div>
+
+            <div class="sidebar-footer">
+                <span class="status-dot"></span>
+                Backend connection
+                <span id="connection-status">Checking...</span>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <h2 id="current-session-title">New conversation</h2>
+                    <p id="current-session-id">Start a conversation with your project agents.</p>
+                </div>
+                <button id="open-user-modal" class="secondary-btn">+ Add user</button>
+            </header>
+
+            <section id="messages" class="messages">
+                <div class="welcome">
+                    <div class="welcome-icon">PT</div>
+                    <h2>Project Tracking Agent</h2>
+                    <p>Ask questions about GitHub repositories, issues, pull requests, Linear projects, and teams.</p>
+                    <div class="suggestions">
+                        <button class="suggestion">Show my GitHub repositories</button>
+                        <button class="suggestion">Show my open pull requests</button>
+                        <button class="suggestion">List my Linear projects</button>
+                    </div>
+                </div>
+            </section>
+
+            <form id="chat-form" class="composer">
+                <textarea id="chat-input" rows="1" placeholder="Ask about GitHub or Linear..." required></textarea>
+                <button id="send-btn" class="primary-btn" type="submit">Send</button>
+            </form>
+            <p class="composer-note">The agent may ask you to clarify which user's data to retrieve.</p>
+        </main>
+    </div>
+
+    <!-- Add user modal -->
+    <div id="user-modal" class="modal hidden">
+        <div class="modal-backdrop" id="modal-backdrop"></div>
+        <section class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2>Add a user</h2>
+                    <p>Create a user and connect platform integrations.</p>
+                </div>
+                <button id="close-user-modal" class="icon-btn" aria-label="Close">×</button>
+            </div>
+
+            <form id="user-form">
+                <label>
+                    Name
+                    <input id="user-name" type="text" maxlength="100" required placeholder="e.g. Jyothir">
+                </label>
+                <label>
+                    Email
+                    <input id="user-email" type="email" required placeholder="name@example.com">
+                </label>
+
+                <div class="form-divider"></div>
+                <p class="form-section-title">Integrations</p>
+
+                <label>
+                    GitHub Personal Access Token <span class="optional">(optional)</span>
+                    <input id="github-secret" type="password" autocomplete="off" placeholder="GitHub token">
+                </label>
+
+                <label>
+                    Linear API Key <span class="optional">(optional)</span>
+                    <input id="linear-secret" type="password" autocomplete="off" placeholder="Linear API key">
+                </label>
+
+                <p class="help-text">Provide at least one integration. Credentials are sent to the backend for validation and encryption.</p>
+                <div id="user-form-error" class="error-text"></div>
+                <div id="user-form-success" class="success-text"></div>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancel-user" class="secondary-btn">Cancel</button>
+                    <button type="submit" id="create-user-btn" class="primary-btn">Create user</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
