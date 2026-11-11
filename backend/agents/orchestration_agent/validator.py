@@ -56,6 +56,7 @@ class IntentValidator:
 
             return {
                 "status": "awaiting_clarification",
+                "clarification_required": True,
                 "pending_clarification": "platform",
                 "response": (
                     "Which platform would you like to query: "
@@ -79,6 +80,7 @@ class IntentValidator:
         if not operation:
             return {
                 "status": "awaiting_clarification",
+                "clarification_required": True,
                 "pending_clarification": "operation",
                 "response": (
                     f"What would you like to retrieve from "
@@ -113,6 +115,7 @@ class IntentValidator:
             if not users:
                 return {
                     "status": "awaiting_clarification",
+                    "clarification_required": True,
                     "pending_clarification": "target_user",
                     "response": (
                         "No users are registered in the User Directory. "
@@ -127,6 +130,7 @@ class IntentValidator:
 
             return {
                 "status": "awaiting_clarification",
+                "clarification_required": True,
                 "pending_clarification": "target_user",
                 "response": (
                     "Whose data would you like to access? "
@@ -149,6 +153,7 @@ class IntentValidator:
 
             return {
                 "status": "awaiting_clarification",
+                "clarification_required": True,
                 "pending_clarification": "target_user",
                 "response": (
                     f"I couldn't find '{target_name}' in the User Directory. "
@@ -160,6 +165,7 @@ class IntentValidator:
         if len(matching_users) > 1:
             return {
                 "status": "awaiting_clarification",
+                "clarification_required": True,
                 "pending_clarification": "target_user",
                 "response": (
                     f"Multiple users match '{target_name}'. "

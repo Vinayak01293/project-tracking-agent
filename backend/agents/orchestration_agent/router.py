@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agents.orchestration_agent.agent_dispatcher import agent_dispatcher
 from agents.orchestration_agent.intent_extractor import extract_intent
+from agents.orchestration_agent.query_builder import generate_agent_query
 from agents.orchestration_agent.state import RouterState
 from agents.orchestration_agent.validator import validator
 
@@ -49,6 +50,8 @@ def reject_request(state: RouterState) -> dict:
     }
 
 def route_ready(state: RouterState):
+ def route_ready(state: RouterState):
+
     route = state.get("route")
 
     if not route:
@@ -57,31 +60,22 @@ def route_ready(state: RouterState):
             "response": "No validated route was found.",
         }
 
-    # Get the latest user message from the conversation.
-    latest_user_message = next(
-        (
-            message
-            for message in reversed(state["messages"])
-            if isinstance(message, HumanMessage)
-        ),
-        None,
-    )
-
-    if latest_user_message is None:
-        return {
-            "status": "failed",
-            "response": "Unable to retrieve the original user query.",
-        }
-
-    query = latest_user_message.content
-
-    if not isinstance(query, str):
-        return {
-            "status": "failed",
-            "response": "The user query must be text.",
-        }
-
     try:
+        if state.get("clarification_required"):
+            query = generate_agent_query(
+                intent=state["intent"],
+                target_user_name=route["target_user_name"],
+            )
+        else:
+            # Use the original user request.
+            query = next(
+                message.content
+                for message in reversed(state["messages"])
+                if isinstance(message, HumanMessage)
+                and message.type == "human"
+                and not state.get("pending_clarification")
+            )
+
         result = agent_dispatcher.dispatch(
             route=route,
             query=query,
@@ -89,29 +83,19 @@ def route_ready(state: RouterState):
 
         return {
             "status": "completed" if result.get("success") else "failed",
-            "response": result.get(
-                "response",
-                "The selected agent did not return a response.",
-            ),
+            "response": result.get("response"),
             "route": route,
         }
 
     except Exception:
-        logger.exception(
-            "AGENT_EXECUTION_FAILED",
-            extra={
-                "platform": route.get("platform"),
-                "target_user_id": str(route.get("target_user_id")),
-            },
-        )
+        logger.exception("AGENT_EXECUTION_FAILED")
 
         return {
             "status": "failed",
-            "response": (
-                "An error occurred while executing the selected agent."
-            ),
+            "response": "An error occurred while executing the selected agent.",
             "route": route,
         }
+    
 # ---------------------------------------------------------
 # Conditional Routing
 # ---------------------------------------------------------

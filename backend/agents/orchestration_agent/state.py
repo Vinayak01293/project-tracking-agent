@@ -26,3 +26,9 @@ class RouterState(TypedDict):
 
     # Validated routing decision
     route: dict[str, Any] | None
+
+    # Whether this request required clarification
+    clarification_required: bool
+
+    # Query to be sent to the specialist agent
+    agent_query: str | None
