@@ -32,3 +32,6 @@ class RouterState(TypedDict):
 
     # Query to be sent to the specialist agent
     agent_query: str | None
+
+    # Original query from the first turn, preserved across clarifications
+    original_query: str | None

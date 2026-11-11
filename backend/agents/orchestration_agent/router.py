@@ -49,8 +49,7 @@ def reject_request(state: RouterState) -> dict:
         "messages": [AIMessage(content=response)],
     }
 
-def route_ready(state: RouterState):
- def route_ready(state: RouterState):
+def route_ready(state: RouterState) -> dict:
 
     route = state.get("route")
 
@@ -61,20 +60,32 @@ def route_ready(state: RouterState):
         }
 
     try:
+        # If clarification was required, build a complete query
+        # using the resolved structured intent.
         if state.get("clarification_required"):
             query = generate_agent_query(
                 intent=state["intent"],
                 target_user_name=route["target_user_name"],
             )
+
+        # Otherwise, pass the original user query directly.
         else:
-            # Use the original user request.
-            query = next(
-                message.content
-                for message in reversed(state["messages"])
-                if isinstance(message, HumanMessage)
-                and message.type == "human"
-                and not state.get("pending_clarification")
-            )
+            query = state.get("original_query")
+
+        if not query:
+            raise ValueError("Unable to determine the agent query.")
+
+        logger.info(
+            "AGENT_QUERY_PREPARED",
+            extra={
+                "platform": route["platform"],
+                "operation": route["operation"],
+                "clarification_required": state.get(
+                    "clarification_required"
+                ),
+                "query": query,
+            },
+        )
 
         result = agent_dispatcher.dispatch(
             route=route,
@@ -92,7 +103,10 @@ def route_ready(state: RouterState):
 
         return {
             "status": "failed",
-            "response": "An error occurred while executing the selected agent.",
+            "response": (
+                "An error occurred while executing "
+                "the selected agent."
+            ),
             "route": route,
         }
     
@@ -189,12 +203,30 @@ def process_query(query: str, thread_id: str) -> dict:
             "component": "agent_router",
             "thread_id": thread_id,
         },
-}
+    }
+
+    # Retrieve the existing conversation state.
+    snapshot = router_graph.get_state(config)
+    current_state = snapshot.values or {}
+
+    # Determine whether this message is answering a clarification.
+    is_continuation = bool(
+        current_state.get("pending_clarification")
+    )
+
+    if is_continuation:
+        original_query = current_state.get("original_query")
+        clarification_required = True
+    else:
+        original_query = query.strip()
+        clarification_required = False
 
     initial_state = {
         "messages": [
             HumanMessage(content=query.strip())
-        ]
+        ],
+        "original_query": original_query,
+        "clarification_required": clarification_required,
     }
 
     result = router_graph.invoke(
