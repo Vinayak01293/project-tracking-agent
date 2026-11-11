@@ -99,10 +99,11 @@ uvicorn main:app --reload
 1.  Open the chat application.
 2.  Select **Add User**.
 3.  Enter the user's name and email.
-4.  Add at least one integration: GitHub Personal Access Token and/or
+4.  Add integrations: GitHub Personal Access Token and
     Linear API key.
 5.  Submit and repeat for the other application user.
 
+Note:-
 The application validates integration credentials with the provider
 before saving the user. Credentials are encrypted before persistence.
 
@@ -371,12 +372,12 @@ secrets.
 
 ## Current Assumptions and Limitations
 
--   This is a take-home demonstration, not a production deployment.
 -   The current GitHub and Linear operations are read-only.
 -   GitHub pull-request listing is scoped to pull requests authored by
     the authenticated GitHub account.
 -   Linear issue listing is scoped to issues assigned to the
-    authenticated Linear account.
+    authenticated Linear account. 
+    For testing we created two API keys for different users.
 -   Provider tool pagination is limited by the current implementation;
     large workspaces may contain more records than one response returns.
 -   Conversation checkpointing uses in-memory state. Use a single
